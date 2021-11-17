@@ -1,24 +1,23 @@
 import ui.*;
 
-//import javax.swing.*;
-//import java.awt.*;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowListener;
-//import java.awt.event.MouseListener;
-//import java.awt.event.MouseMotionListener;
-//import java.awt.event.WindowListener;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Player {
     public boolean playerIsActive= true;
     public boolean currentlyPlaying = true;
     public String windowTitle = "Useless Player";
-    String[][] queueArray; // Initialize the array
+    String[][] queueArray;
     public int amountSongs = 0;
     public int currentSongIndex = 0;
     public String[] currentSong;
     public AddSongWindow addSongWindow;
     public WindowListener addSongWindowListener;
     public PlayerWindow player;
+    public Lock lock = new ReentrantLock();
+    public Thread scrubberThread;
 
     public Player() {
 
@@ -66,7 +65,10 @@ public class Player {
                 Integer.parseInt(currentSong[5]),
                 currentSongIndex,
                 amountSongs);
+        this.player.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
         this.player.enableScrubberArea();
+        this.scrubberThread = new ScrubberThread(this.player, this);
+        this.scrubberThread.start();
     }
 
     private void stopListener() {
@@ -74,16 +76,24 @@ public class Player {
         this.playerIsActive = false;
         this.currentlyPlaying = false;
         this.player.resetMiniPlayer();
+        if (this.scrubberThread.isAlive())
+            this.scrubberThread.interrupt();
     }
 
     private void playPauseListener() {
         if (this.currentlyPlaying) {
             this.currentlyPlaying = false;
             System.out.println("Pause");
+            this.scrubberThread.interrupt();
         }
         else {
             this.currentlyPlaying = true;
             System.out.println("Play");
+            this.currentSongIndex = this.player.getSelectedSongID();
+            this.currentSong = this.queueArray[this.currentSongIndex];
+            this.player.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+            this.scrubberThread = new ScrubberThread(this.player, this);
+            this.scrubberThread.start();
         }
         this.player.updatePlayPauseButton(currentlyPlaying);
     }
@@ -96,6 +106,7 @@ public class Player {
 
     private void removeSongListener() {
         System.out.println("Remove");
+        this.lock.lock();
         if (amountSongs == 0) {
             System.out.println("No songs to remove");
             return;
@@ -112,13 +123,16 @@ public class Player {
         }
         this.queueArray = updatedQueue;
         this.player.updateQueueList(updatedQueue);
-        amountSongs--;
+        this.amountSongs--;
+        this.lock.unlock();
     }
 
     private void addSongOkListener() {
+        this.lock.lock();
         String[] newSong = this.addSongWindow.getSong();
         this.queueArray = addToQueue(newSong);
         this.player.updateQueueList(this.queueArray);
+        this.lock.unlock();
     }
 
     private String[][] addToQueue(String[] newSong) {
