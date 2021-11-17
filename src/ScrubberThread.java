@@ -1,9 +1,9 @@
 import ui.*;
 
 public class ScrubberThread extends Thread {
-    public PlayerWindow playerWindow;
-    public Player playerObject;
-    int t0;
+    private final PlayerWindow playerWindow;
+    private final Player playerObject;
+    private int t0;
 
     public ScrubberThread(PlayerWindow playerWindow, Player playerObject){
         this.playerWindow = playerWindow;
@@ -13,7 +13,9 @@ public class ScrubberThread extends Thread {
     @Override
     public void run() {
         try{
-            this.t0 = this.playerWindow.getScrubberValue();
+            // Utilizando scrubber value pra continuar de onde parou ou começar do zero numa nova música
+            int p = this.playerWindow.getScrubberValue();
+            this.t0 = this.playerObject.lastId == this.playerWindow.getSelectedSongID() ? p : 0;
             int tf = Integer.parseInt(this.playerObject.currentSong[5]);
             if (this.playerObject.currentlyPlaying) {
                 while (this.t0 < tf) {
@@ -27,6 +29,7 @@ public class ScrubberThread extends Thread {
                     Thread.sleep(1000);
                     this.t0 += 1;
                 }
+                // Caso a música acabar
                 this.playerWindow.updatePlayPauseButton(false);
                 this.playerObject.currentlyPlaying = false;
                 this.playerWindow.updateMiniplayer(false,
@@ -37,7 +40,9 @@ public class ScrubberThread extends Thread {
                         this.playerObject.currentSongIndex,
                         this.playerObject.amountSongs);
             }
-        } catch (InterruptedException e) {}
+        } catch (InterruptedException e) {
+
+        }
 
     }
 }

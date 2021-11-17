@@ -9,19 +9,21 @@ public class Player {
     public boolean playerIsActive= true;
     public boolean currentlyPlaying = true;
     public String windowTitle = "Useless Player";
-    String[][] queueArray;
+    public String[][] queueArray;
     public int amountSongs = 0;
     public int currentSongIndex = 0;
+    public int lastId = -1;
     public String[] currentSong;
     public AddSongWindow addSongWindow;
     public WindowListener addSongWindowListener;
-    public PlayerWindow player;
+    public PlayerWindow playerWindow;
     public Lock lock = new ReentrantLock();
     public Thread scrubberThread;
 
     public Player() {
 
-        ActionListener buttonListenerPlayNow =  e -> playNowListener();
+        // ActionListeners
+        ActionListener buttonListenerPlayNow = e -> playNowListener();
         ActionListener buttonListenerStop =  e -> stopListener();
         ActionListener buttonListenerPlayPause =  e -> playPauseListener();
         ActionListener buttonListenerAddSong =  e -> addSongListener();
@@ -31,8 +33,8 @@ public class Player {
         ActionListener buttonListenerShuffle =  e -> {};
         ActionListener buttonListenerRepeat =  e -> {};
 
-        this.queueArray = new String[1][7];
-        this.player = new PlayerWindow(
+        this.queueArray = new String[1][7]; // Tava dizendo que queueArray era nulo, inicializar aqui resolveu
+        this.playerWindow = new PlayerWindow(
                                     buttonListenerPlayNow,
                                     buttonListenerRemove,
                                     buttonListenerAddSong,
@@ -46,18 +48,24 @@ public class Player {
                                     null,
                                     this.windowTitle,
                                     this.queueArray);
-        this.addSongWindowListener = player.getAddSongWindowListener();
-        this.player.start();
+        this.addSongWindowListener = this.playerWindow.getAddSongWindowListener();
+        this.playerWindow.start();
     }
 
     private void playNowListener() {
+        /* Quando o player começar a trabalhar
+        * Setar atividade e estado do player para verdadeiro
+        * Atualizar as informações ma janela
+        * Setar o estado do botao de play e scrubber para verdadeiro
+        * Iniciar a thread de update do scrubber
+        */
         System.out.println("Start");
         this.playerIsActive = true;
         this.currentlyPlaying = true;
-        this.player.updatePlayPauseButton(true);
-        this.currentSongIndex = this.player.getSelectedSongID();
+        this.playerWindow.updatePlayPauseButton(true);
+        this.currentSongIndex = this.playerWindow.getSelectedSongID();
         this.currentSong = this.queueArray[currentSongIndex];
-        this.player.updateMiniplayer(
+        this.playerWindow.updateMiniplayer(
                 true,
                 true,
                 false,
@@ -65,37 +73,42 @@ public class Player {
                 Integer.parseInt(currentSong[5]),
                 currentSongIndex,
                 amountSongs);
-        this.player.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
-        this.player.enableScrubberArea();
-        this.scrubberThread = new ScrubberThread(this.player, this);
+        this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+        this.playerWindow.enableScrubberArea();
+        this.scrubberThread = new ScrubberThread(this.playerWindow, this);
         this.scrubberThread.start();
     }
 
     private void stopListener() {
+        // Basicamente fazer o contrario do playNowListener
         System.out.println("Stop");
         this.playerIsActive = false;
         this.currentlyPlaying = false;
-        this.player.resetMiniPlayer();
+        this.playerWindow.resetMiniPlayer();
         if (this.scrubberThread.isAlive())
             this.scrubberThread.interrupt();
     }
 
     private void playPauseListener() {
+        /* Ao clicar
+        * - Caso esteja tocando: pausar e interromper a thread to scrubber
+        * - Caso pausado: setar o estado do player e iniciar a thread to scrubber */
         if (this.currentlyPlaying) {
             this.currentlyPlaying = false;
             System.out.println("Pause");
+            this.lastId = currentSongIndex;
             this.scrubberThread.interrupt();
         }
         else {
             this.currentlyPlaying = true;
             System.out.println("Play");
-            this.currentSongIndex = this.player.getSelectedSongID();
+            this.currentSongIndex = this.playerWindow.getSelectedSongID();
             this.currentSong = this.queueArray[this.currentSongIndex];
-            this.player.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
-            this.scrubberThread = new ScrubberThread(this.player, this);
+            this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+            this.scrubberThread = new ScrubberThread(this.playerWindow, this);
             this.scrubberThread.start();
         }
-        this.player.updatePlayPauseButton(currentlyPlaying);
+        this.playerWindow.updatePlayPauseButton(currentlyPlaying);
     }
 
     private void addSongListener() {
@@ -106,36 +119,44 @@ public class Player {
 
     private void removeSongListener() {
         System.out.println("Remove");
-        this.lock.lock();
         if (amountSongs == 0) {
             System.out.println("No songs to remove");
             return;
         }
-        String[][] updatedQueue = new String[this.amountSongs - 1][];
-        int toRemove = this.player.getSelectedSongID();
-        int j = 0;
-        for (int i = 0; i < this.amountSongs; i++) {
-            if (i != toRemove) {
-                updatedQueue[j] = this.queueArray[i];
-                updatedQueue[j][6] = Integer.toString(j);
-                j++;
+        // Por planejar utilizar as ids nas features futuras
+        // Remover uma música atualiza as ids das que viriam depois da que foi removida
+        new Thread(() -> {
+            lock.lock();
+            String[][] updatedQueue = new String[this.amountSongs - 1][];
+            int toRemove = this.playerWindow.getSelectedSongID();
+            int j = 0;
+            for (int i = 0; i < this.amountSongs; i++) {
+                if (i != toRemove) {
+                    updatedQueue[j] = this.queueArray[i];
+                    updatedQueue[j][6] = Integer.toString(j);
+                    j++;
+                }
             }
-        }
-        this.queueArray = updatedQueue;
-        this.player.updateQueueList(updatedQueue);
-        this.amountSongs--;
-        this.lock.unlock();
+            this.queueArray = updatedQueue;
+            this.playerWindow.updateQueueList(updatedQueue);
+            this.amountSongs--;
+            lock.unlock();
+        }).start();
+
     }
 
     private void addSongOkListener() {
-        this.lock.lock();
-        String[] newSong = this.addSongWindow.getSong();
-        this.queueArray = addToQueue(newSong);
-        this.player.updateQueueList(this.queueArray);
-        this.lock.unlock();
+        new Thread(() -> {
+            lock.lock();
+            String[] newSong = addSongWindow.getSong();
+            queueArray = addToQueue(newSong);
+            playerWindow.updateQueueList(queueArray);
+            lock.unlock();
+        }).start();
     }
 
     private String[][] addToQueue(String[] newSong) {
+        // Constroi uma playlist atualizada a partir da queue atual
         String[][] updatedQueue = new String[this.amountSongs + 1][];
         for (int i = 0; i < this.amountSongs; i++) {
             updatedQueue[i] = this.queueArray[i];
@@ -145,6 +166,4 @@ public class Player {
         System.out.println("Added a song!");
         return updatedQueue;
     }
-
 }
-
