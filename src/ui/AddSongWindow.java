@@ -20,13 +20,11 @@ public class AddSongWindow extends Thread {
     /**
      * Window to input information from a song to be added to the queue. The object with that information is returned
      * by the method getSong().
-     *
-     * @param songID                  Integer unique to that song. Used as an identifier.
+     *  @param songID                  Integer unique to that song. Used as an identifier.
      * @param buttonListenerAddSongOK ActionListener for the "OK" button. Should be created in the Player class.
      * @param windowListener          WindowListener for the "OK" button for internal use.
-     *                                Should be acquired from PlayerWindow.getAddSongWindowListener().
      */
-    public AddSongWindow(String songID, ActionListener buttonListenerAddSongOK, WindowListener windowListener) {
+    public AddSongWindow(int songID, ActionListener buttonListenerAddSongOK, WindowListener windowListener) {
 
         JFrame window = new JFrame();
         window.addWindowListener(windowListener);
@@ -216,7 +214,7 @@ public class AddSongWindow extends Thread {
                                     songYear,
                                     songLength,
                                     songLengthSeconds,
-                                    songID};
+                                    Integer.toString(songID)};
                             buttonListenerAddSongOK.actionPerformed(new ActionEvent(this, ActionEvent.ACTION_PERFORMED, null));
                             window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
                         } else {
