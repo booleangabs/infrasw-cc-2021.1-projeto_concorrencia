@@ -18,7 +18,9 @@ public class ScrubberThread extends Thread {
             this.t0 = this.playerObject.lastId == this.playerWindow.getSelectedSongID() ? p : 0;
             int tf = Integer.parseInt(this.playerObject.currentSong[5]);
             if (this.playerObject.currentlyPlaying) {
+                Thread.sleep(1000);
                 while (this.t0 < tf) {
+                    this.t0 += 1;
                     this.playerWindow.updateMiniplayer(true,
                             true,
                             false,
@@ -27,15 +29,14 @@ public class ScrubberThread extends Thread {
                             this.playerObject.currentSongIndex,
                             this.playerObject.amountSongs);
                     Thread.sleep(1000);
-                    this.t0 += 1;
                 }
                 // Caso a música acabar
                 this.playerWindow.updatePlayPauseButton(false);
                 this.playerObject.currentlyPlaying = false;
-                this.playerWindow.updateMiniplayer(false,
+                this.playerWindow.updateMiniplayer(true,
                         false,
                         false,
-                        t0,
+                        0,
                         tf,
                         this.playerObject.currentSongIndex,
                         this.playerObject.amountSongs);
@@ -43,6 +44,5 @@ public class ScrubberThread extends Thread {
         } catch (InterruptedException e) {
 
         }
-
     }
 }

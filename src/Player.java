@@ -4,9 +4,10 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowListener;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.Condition;
 
 public class Player {
-    public boolean playerIsActive= true;
+    public boolean playerIsActive = true;
     public boolean currentlyPlaying = true;
     public String windowTitle = "Useless Player";
     public String[][] queueArray;
@@ -18,6 +19,8 @@ public class Player {
     public WindowListener addSongWindowListener;
     public PlayerWindow playerWindow;
     public Lock lock = new ReentrantLock();
+    public Condition condition = lock.newCondition();
+    public boolean isBusy = false;
     public Thread scrubberThread;
 
     public Player() {
@@ -85,8 +88,8 @@ public class Player {
         this.playerIsActive = false;
         this.currentlyPlaying = false;
         this.playerWindow.resetMiniPlayer();
-        if (this.scrubberThread.isAlive())
-            this.scrubberThread.interrupt();
+        this.scrubberThread.interrupt();
+        this.playerWindow.disableScrubberArea();
     }
 
     private void playPauseListener() {
@@ -117,45 +120,27 @@ public class Player {
         this.addSongWindow = new AddSongWindow(this.amountSongs, addOk, addSongWindowListener);
     }
 
-    private void removeSongListener() {
-        System.out.println("Remove");
-        if (amountSongs == 0) {
-            System.out.println("No songs to remove");
-            return;
-        }
-        // Por planejar utilizar as ids nas features futuras
-        // Remover uma música atualiza as ids das que viriam depois da que foi removida
-        new Thread(() -> {
-            lock.lock();
-            String[][] updatedQueue = new String[this.amountSongs - 1][];
-            int toRemove = this.playerWindow.getSelectedSongID();
-            int j = 0;
-            for (int i = 0; i < this.amountSongs; i++) {
-                if (i != toRemove) {
-                    updatedQueue[j] = this.queueArray[i];
-                    updatedQueue[j][6] = Integer.toString(j);
-                    j++;
-                }
-            }
-            this.queueArray = updatedQueue;
-            this.playerWindow.updateQueueList(updatedQueue);
-            this.amountSongs--;
-            lock.unlock();
-        }).start();
-
-    }
-
     private void addSongOkListener() {
         new Thread(() -> {
-            lock.lock();
-            String[] newSong = addSongWindow.getSong();
-            queueArray = addToQueue(newSong);
-            playerWindow.updateQueueList(queueArray);
-            lock.unlock();
+            try {
+                this.lock.lock();
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
+                String[] newSong = addSongWindow.getSong();
+                queueArray = getUpdatedQueue(newSong);
+                playerWindow.updateQueueList(queueArray);
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
         }).start();
     }
 
-    private String[][] addToQueue(String[] newSong) {
+    private String[][] getUpdatedQueue(String[] newSong) {
         // Constroi uma playlist atualizada a partir da queue atual
         String[][] updatedQueue = new String[this.amountSongs + 1][];
         for (int i = 0; i < this.amountSongs; i++) {
@@ -166,4 +151,44 @@ public class Player {
         System.out.println("Added a song!");
         return updatedQueue;
     }
+
+    private void removeSongListener() {
+        System.out.println("Remove");
+        if (amountSongs == 0) {
+            System.out.println("No songs to remove");
+            return;
+        }
+        // Por planejar utilizar as ids nas features futuras
+        // Remover uma música atualiza as ids das que viriam depois da que foi removida
+        new Thread(() -> {
+            try {
+                this.lock.lock();
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
+                String[][] updatedQueue = new String[this.amountSongs - 1][];
+                int toRemove = this.playerWindow.getSelectedSongID();
+                int j = 0;
+                for (int i = 0; i < this.amountSongs; i++) {
+                    if (i != toRemove) {
+                        updatedQueue[j] = this.queueArray[i];
+                        updatedQueue[j][6] = Integer.toString(j);
+                        j++;
+                    }
+                }
+                this.queueArray = updatedQueue;
+                this.playerWindow.updateQueueList(updatedQueue);
+                this.amountSongs--;
+                if (toRemove == this.currentSongIndex)
+                    this.stopListener();
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
+    }
+
 }
