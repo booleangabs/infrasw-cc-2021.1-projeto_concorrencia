@@ -15,6 +15,7 @@ public class Player {
     public int currentSongIndex = 0;
     public int lastId = -1;
     public String[] currentSong;
+
     public AddSongWindow addSongWindow;
     public WindowListener addSongWindowListener;
     public PlayerWindow playerWindow;
@@ -121,15 +122,18 @@ public class Player {
     }
 
     private void addSongOkListener() {
+        // Copiar aqui
         new Thread(() -> {
             try {
                 this.lock.lock();
                 while (this.isBusy)
                     this.condition.await();
-                this.isBusy = true;
+                this.isBusy = true; // até aqui
+                // Insira codigo aqui
                 String[] newSong = addSongWindow.getSong();
                 queueArray = getUpdatedQueue(newSong);
                 playerWindow.updateQueueList(queueArray);
+                // Copiar daqui
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -137,7 +141,7 @@ public class Player {
             } finally {
                 this.lock.unlock();
             }
-        }).start();
+        }).start();//ate aqui
     }
 
     private String[][] getUpdatedQueue(String[] newSong) {
