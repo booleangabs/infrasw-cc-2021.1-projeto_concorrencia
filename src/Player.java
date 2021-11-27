@@ -1,7 +1,6 @@
 import ui.*;
 
-import java.awt.event.ActionListener;
-import java.awt.event.WindowListener;
+import java.awt.event.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
@@ -15,7 +14,6 @@ public class Player {
     public int currentSongIndex = 0;
     public int lastId = -1;
     public String[] currentSong;
-
     public AddSongWindow addSongWindow;
     public WindowListener addSongWindowListener;
     public PlayerWindow playerWindow;
@@ -23,6 +21,7 @@ public class Player {
     public Condition condition = lock.newCondition();
     public boolean isBusy = false;
     public Thread scrubberThread;
+    public boolean wasPaused = false;
 
     public Player() {
 
@@ -37,6 +36,38 @@ public class Player {
         ActionListener buttonListenerShuffle =  e -> {};
         ActionListener buttonListenerRepeat =  e -> {};
 
+        // Mouse listeners
+        MouseListener scrubberListenerClick = new MouseListener(){
+            @Override
+            public void mousePressed(MouseEvent e){
+                onMousePress();
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e){
+                onMouseRelease();
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e){}
+
+            @Override
+            public void mouseExited(MouseEvent e){}
+
+            @Override
+            public void mouseClicked(MouseEvent e) {}
+        };
+
+        MouseMotionListener scrubberListenerMotion = new MouseMotionListener(){
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                onMouseDrag();
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e){}
+        };
+
         this.queueArray = new String[1][7]; // Tava dizendo que queueArray era nulo, inicializar aqui resolveu
         this.playerWindow = new PlayerWindow(
                                     buttonListenerPlayNow,
@@ -48,12 +79,47 @@ public class Player {
                                     buttonListenerPrevious,
                                     buttonListenerShuffle,
                                     buttonListenerRepeat,
-                                    null,
-                                    null,
+                                    scrubberListenerClick,
+                                    scrubberListenerMotion,
                                     this.windowTitle,
                                     this.queueArray);
         this.addSongWindowListener = this.playerWindow.getAddSongWindowListener();
         this.playerWindow.start();
+    }
+
+    private void onMousePress() {
+        System.out.println("Waiting for scrubber drag");
+        if (this.currentlyPlaying) {
+            this.wasPaused = false;
+            this.currentlyPlaying = false;
+            this.lastId = currentSongIndex;
+            this.scrubberThread.interrupt();
+            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+        }
+        else {
+            this.wasPaused = true;
+        }
+    }
+
+    private void onMouseRelease() {
+        if (this.wasPaused) {}
+        else {
+            this.currentlyPlaying = true;
+            this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+            this.scrubberThread.start();
+            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+        }
+        System.out.println("Resume from " + this.playerWindow.getScrubberValue() + "s on.");
+    }
+
+    private void onMouseDrag() {
+        this.playerWindow.updateMiniplayer(true,
+                false,
+                false,
+                this.playerWindow.getScrubberValue(),
+                Integer.parseInt(this.currentSong[5]),
+                this.currentSongIndex,
+                this.amountSongs);
     }
 
     private void playNowListener() {
