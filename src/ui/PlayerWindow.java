@@ -2,6 +2,7 @@ package ui;
 
 import com.formdev.flatlaf.FlatLightLaf;
 import ui.resources.fonts.roboto_condensed.Roboto;
+import ui.resources.icons.Icons;
 import ui.support.MiniPlayerPanel;
 import ui.support.QueuePanel;
 
@@ -75,6 +76,8 @@ public class PlayerWindow extends Thread {
 
         window.setLayout(new BorderLayout());
         window.setTitle(windowTitle);
+        ImageIcon windowIcon = new ImageIcon(Objects.requireNonNull(Icons.class.getResource("poop-24.png")));
+        window.setIconImage(windowIcon.getImage());
         // Unreliable behavior with setMinimumSize. Apparently when using high dpi screens with fractional scaling.
         // window.setMinimumSize(new Dimension(667, 450));
         window.setSize(718, 600);

@@ -15,7 +15,9 @@ public class ScrubberThread extends Thread {
         try{
             // Utilizando scrubber value pra continuar de onde parou ou começar do zero numa nova música
             int p = this.playerWindow.getScrubberValue();
-            this.t0 = this.playerObject.lastId == this.playerWindow.getSelectedSongID() ? p : 0;
+            System.out.println(this.playerObject.lastId);
+            System.out.println(this.playerObject.currentSongIndex);
+            this.t0 = this.playerObject.lastId == this.playerObject.currentSongIndex ? p : 0;
             int tf = Integer.parseInt(this.playerObject.currentSong[5]);
             if (this.playerObject.currentlyPlaying) {
                 while (this.t0 <= tf) {
@@ -30,18 +32,27 @@ public class ScrubberThread extends Thread {
                     Thread.sleep(1000);
                 }
                 // Caso a música acabar
-                this.playerWindow.updatePlayPauseButton(false);
-                this.playerObject.currentlyPlaying = false;
-                this.playerWindow.updateMiniplayer(true,
-                        false,
-                        false,
-                        0,
-                        tf,
-                        this.playerObject.currentSongIndex,
-                        this.playerObject.amountSongs);
+                // Se for no meio da playlist continue para a próxima
+                if (this.playerObject.currentSongIndex < this.playerObject.amountSongs - 1) {
+                    this.playerObject.skipToNextSong();
+                }
+                // Se essa foi a última, parar
+                // OBS: A ser modificado na implementação do botão repeat
+                else {
+                    this.playerWindow.updatePlayPauseButton(false);
+                    this.playerObject.currentlyPlaying = false;
+                    this.playerWindow.updateMiniplayer(true,
+                            false,
+                            false,
+                            tf,
+                            tf,
+                            this.playerObject.currentSongIndex,
+                            this.playerObject.amountSongs);
+                    System.out.println("Finished");
+                }
             }
         } catch (InterruptedException e) {
-
+            e.printStackTrace();
         }
     }
 }

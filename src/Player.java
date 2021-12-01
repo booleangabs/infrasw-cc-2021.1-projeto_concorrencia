@@ -22,6 +22,7 @@ public class Player {
     public boolean isBusy = false;
     public Thread scrubberThread;
     public boolean wasPaused = false;
+    public boolean clickedNextOrPrevious = false;
 
     public Player() {
 
@@ -31,8 +32,9 @@ public class Player {
         ActionListener buttonListenerPlayPause =  e -> playPauseListener();
         ActionListener buttonListenerAddSong =  e -> addSongListener();
         ActionListener buttonListenerRemove =  e -> removeSongListener();
-        ActionListener buttonListenerNext =  e -> {};
-        ActionListener buttonListenerPrevious =  e -> {};
+
+        ActionListener buttonListenerNext =  e -> nextSongListener();
+        ActionListener buttonListenerPrevious =  e -> previousSongListener();
         ActionListener buttonListenerShuffle =  e -> {};
         ActionListener buttonListenerRepeat =  e -> {};
 
@@ -102,8 +104,7 @@ public class Player {
     }
 
     private void onMouseRelease() {
-        if (this.wasPaused) {}
-        else {
+        if (!this.wasPaused) {
             this.currentlyPlaying = true;
             this.scrubberThread = new ScrubberThread(this.playerWindow, this);
             this.scrubberThread.start();
@@ -172,13 +173,15 @@ public class Player {
         else {
             this.currentlyPlaying = true;
             System.out.println("Play");
-            this.currentSongIndex = this.playerWindow.getSelectedSongID();
+            // Evita começar a música antiga de novo (quando clicar no next/previous enquanto estiver pausado)
+            if (this.clickedNextOrPrevious) { this.clickedNextOrPrevious = false;}
+            else { this.currentSongIndex = this.playerWindow.getSelectedSongID(); }
             this.currentSong = this.queueArray[this.currentSongIndex];
             this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
             this.scrubberThread = new ScrubberThread(this.playerWindow, this);
             this.scrubberThread.start();
         }
-        this.playerWindow.updatePlayPauseButton(currentlyPlaying);
+        this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
     }
 
     private void addSongListener() {
@@ -238,6 +241,7 @@ public class Player {
                 this.isBusy = true;
                 String[][] updatedQueue = new String[this.amountSongs - 1][];
                 int toRemove = this.playerWindow.getSelectedSongID();
+
                 int j = 0;
                 for (int i = 0; i < this.amountSongs; i++) {
                     if (i != toRemove) {
@@ -249,8 +253,8 @@ public class Player {
                 this.queueArray = updatedQueue;
                 this.playerWindow.updateQueueList(updatedQueue);
                 this.amountSongs--;
-                if (toRemove == this.currentSongIndex)
-                    this.stopListener();
+                if (toRemove == this.currentSongIndex) { this.stopListener(); }
+                if (toRemove < this.currentSongIndex) { this.currentSongIndex--; }
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -261,4 +265,95 @@ public class Player {
         }).start();
     }
 
+    private void nextSongListener() {
+        new Thread(() -> {
+            try {
+                this.lock.lock();
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
+
+                System.out.println("Avançando");
+
+                // interromper a thread do scrubber
+                this.scrubberThread.interrupt();
+                if (!this.currentlyPlaying) { this.clickedNextOrPrevious = true; }
+                this.currentSongIndex++;
+                System.out.println(this.currentSongIndex);
+                this.currentSong = this.queueArray[this.currentSongIndex];
+                this.playerWindow.updateMiniplayer(true,
+                        false,
+                        false,
+                        0,
+                        Integer.parseInt(this.currentSong[5]),
+                        this.currentSongIndex,
+                        this.amountSongs);
+                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+
+                //iniciar nova thread
+                if (this.currentlyPlaying) {
+                    this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+                    this.scrubberThread.start();
+                }
+
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
+    }
+
+    // Só planejamos utilizar essa função ao fim de uma música
+    public void skipToNextSong() {
+        try {
+            Thread.sleep(1000); // Sem utilidade, só pra ter um delay natural
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        this.nextSongListener();
+    }
+
+    private void previousSongListener() {
+        new Thread(() -> {
+            try {
+                this.lock.lock();
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
+
+                System.out.println("Retornando");
+
+                // interromper a thread do scrubber
+                this.scrubberThread.interrupt();
+                if (!this.currentlyPlaying) { this.clickedNextOrPrevious = true; }
+                this.currentSongIndex--;
+                System.out.println(this.currentSongIndex);
+                this.currentSong = this.queueArray[this.currentSongIndex];
+                this.playerWindow.updateMiniplayer(true,
+                        false,
+                        false,
+                        0,
+                        Integer.parseInt(this.currentSong[5]),
+                        this.currentSongIndex,
+                        this.amountSongs);
+                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+
+                //iniciar nova thread
+                if (this.currentlyPlaying) {
+                    this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+                    this.scrubberThread.start();
+                }
+
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
+    }
 }

@@ -46,7 +46,6 @@ public class MiniPlayerPanel extends JPanel {
 
         this.setLayout(new BoxLayout(this, BoxLayout.PAGE_AXIS));
         this.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
-
         miniPlayerInfoAndScrubber.setLayout(new GridLayout(2, 1, 0, 0));
         GroupLayout groupLayout = new GroupLayout(miniPlayerScrubberPanel);
         miniPlayerScrubberPanel.setLayout(groupLayout);
