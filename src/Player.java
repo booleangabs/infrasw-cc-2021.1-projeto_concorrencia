@@ -6,10 +6,10 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
 
 public class Player {
-    public boolean playerIsActive = true;
-    public boolean currentlyPlaying = true;
+    public boolean playerIsActive = false;
+    public boolean currentlyPlaying = false;
     public String windowTitle = "Useless Player";
-    public String[][] queueArray;
+    public String[][] queueArray = new String[][] {{"", "", "", "", "", "", ""}};
     public int amountSongs = 0;
     public int currentSongIndex = 0;
     public int lastId = -1;
@@ -35,8 +35,8 @@ public class Player {
 
         ActionListener buttonListenerNext =  e -> nextSongListener();
         ActionListener buttonListenerPrevious =  e -> previousSongListener();
-        ActionListener buttonListenerShuffle =  e -> {};
-        ActionListener buttonListenerRepeat =  e -> {};
+        ActionListener buttonListenerShuffle =  e -> shuffleListener();
+        ActionListener buttonListenerRepeat =  e -> repeatListener();
 
         // Mouse listeners
         MouseListener scrubberListenerClick = new MouseListener(){
@@ -70,7 +70,6 @@ public class Player {
             public void mouseMoved(MouseEvent e){}
         };
 
-        this.queueArray = new String[1][7]; // Tava dizendo que queueArray era nulo, inicializar aqui resolveu
         this.playerWindow = new PlayerWindow(
                                     buttonListenerPlayNow,
                                     buttonListenerRemove,
@@ -91,24 +90,57 @@ public class Player {
 
     private void onMousePress() {
         System.out.println("Waiting for scrubber drag");
-        if (this.currentlyPlaying) {
-            this.wasPaused = false;
-            this.currentlyPlaying = false;
-            this.lastId = currentSongIndex;
-            this.scrubberThread.interrupt();
-            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
-        }
-        else {
-            this.wasPaused = true;
-        }
+        new Thread(() -> {
+            this.lock.lock();
+            try {
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true; // até aqui
+                // Insira codigo aqui
+                if (this.currentlyPlaying) {
+                    this.wasPaused = false;
+                    this.currentlyPlaying = false;
+                    this.lastId = currentSongIndex;
+                    this.scrubberThread.interrupt();
+                    this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+                }
+                else {
+                    this.wasPaused = true;
+                }
+                // Copiar daqui
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
+
     }
 
     private void onMouseRelease() {
         if (!this.wasPaused) {
-            this.currentlyPlaying = true;
-            this.scrubberThread = new ScrubberThread(this.playerWindow, this);
-            this.scrubberThread.start();
-            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+            new Thread(() -> {
+                this.lock.lock();
+                try {
+                    while (this.isBusy)
+                        this.condition.await();
+                    this.isBusy = true; // até aqui
+                    // Insira codigo aqui
+                    this.currentlyPlaying = true;
+                    this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+                    this.scrubberThread.start();
+                    this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+                    // Copiar daqui
+                    this.isBusy = false;
+                    this.condition.signalAll();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                } finally {
+                    this.lock.unlock();
+                }
+            }).start();
         }
         System.out.println("Resume from " + this.playerWindow.getScrubberValue() + "s on.");
     }
@@ -130,34 +162,67 @@ public class Player {
         * Setar o estado do botao de play e scrubber para verdadeiro
         * Iniciar a thread de update do scrubber
         */
-        System.out.println("Start");
-        this.playerIsActive = true;
-        this.currentlyPlaying = true;
-        this.playerWindow.updatePlayPauseButton(true);
-        this.currentSongIndex = this.playerWindow.getSelectedSongID();
-        this.currentSong = this.queueArray[currentSongIndex];
-        this.playerWindow.updateMiniplayer(
-                true,
-                true,
-                false,
-                0,
-                Integer.parseInt(currentSong[5]),
-                currentSongIndex,
-                amountSongs);
-        this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
-        this.playerWindow.enableScrubberArea();
-        this.scrubberThread = new ScrubberThread(this.playerWindow, this);
-        this.scrubberThread.start();
+        new Thread(() -> {
+            this.lock.lock();
+            try {
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true; // até aqui
+                // Insira codigo aqui
+                System.out.println("Start");
+                if (this.currentlyPlaying) { this.scrubberThread.interrupt(); }
+                this.playerIsActive = true;
+                this.currentlyPlaying = true;
+                this.playerWindow.updatePlayPauseButton(true);
+                this.currentSongIndex = this.playerWindow.getSelectedSongID();
+                this.currentSong = this.queueArray[currentSongIndex];
+                this.playerWindow.updateMiniplayer(
+                        true,
+                        true,
+                        false,
+                        0,
+                        Integer.parseInt(currentSong[5]),
+                        currentSongIndex,
+                        amountSongs);
+                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                this.playerWindow.enableScrubberArea();
+                this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+                this.scrubberThread.start();
+
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();//ate aqui
     }
 
     private void stopListener() {
         // Basicamente fazer o contrario do playNowListener
         System.out.println("Stop");
-        this.playerIsActive = false;
-        this.currentlyPlaying = false;
-        this.playerWindow.resetMiniPlayer();
-        this.scrubberThread.interrupt();
-        this.playerWindow.disableScrubberArea();
+        new Thread(() -> {
+            this.lock.lock();
+            try {
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true; // até aqui
+                // Insira codigo aqui
+                this.playerIsActive = false;
+                this.currentlyPlaying = false;
+                this.playerWindow.resetMiniPlayer();
+                this.scrubberThread.interrupt();
+                this.playerWindow.disableScrubberArea();
+                // Copiar daqui
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
     }
 
     private void playPauseListener() {
@@ -193,8 +258,8 @@ public class Player {
     private void addSongOkListener() {
         // Copiar aqui
         new Thread(() -> {
+            this.lock.lock();
             try {
-                this.lock.lock();
                 while (this.isBusy)
                     this.condition.await();
                 this.isBusy = true; // até aqui
@@ -234,8 +299,8 @@ public class Player {
         // Por planejar utilizar as ids nas features futuras
         // Remover uma música atualiza as ids das que viriam depois da que foi removida
         new Thread(() -> {
+            this.lock.lock();
             try {
-                this.lock.lock();
                 while (this.isBusy)
                     this.condition.await();
                 this.isBusy = true;
@@ -253,8 +318,10 @@ public class Player {
                 this.queueArray = updatedQueue;
                 this.playerWindow.updateQueueList(updatedQueue);
                 this.amountSongs--;
-                if (toRemove == this.currentSongIndex) { this.stopListener(); }
-                if (toRemove < this.currentSongIndex) { this.currentSongIndex--; }
+                if (toRemove == this.currentSongIndex){
+                    this.stopListener();
+                }
+
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -267,8 +334,8 @@ public class Player {
 
     private void nextSongListener() {
         new Thread(() -> {
+            this.lock.lock();
             try {
-                this.lock.lock();
                 while (this.isBusy)
                     this.condition.await();
                 this.isBusy = true;
@@ -311,15 +378,15 @@ public class Player {
         try {
             Thread.sleep(1000); // Sem utilidade, só pra ter um delay natural
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            System.out.println("Sleep interrompido");
         }
         this.nextSongListener();
     }
 
     private void previousSongListener() {
         new Thread(() -> {
+            this.lock.lock();
             try {
-                this.lock.lock();
                 while (this.isBusy)
                     this.condition.await();
                 this.isBusy = true;
@@ -355,5 +422,13 @@ public class Player {
                 this.lock.unlock();
             }
         }).start();
+    }
+
+    private void repeatListener() {
+
+    }
+
+    private void shuffleListener() {
+
     }
 }
