@@ -1,5 +1,6 @@
 import ui.*;
 
+import javax.swing.*;
 import java.awt.event.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -23,6 +24,8 @@ public class Player {
     public Thread scrubberThread;
     public boolean wasPaused = false;
     public boolean clickedNextOrPrevious = false;
+    public boolean isRepeating = false;
+    public boolean isShuffling = false;
 
     public Player() {
 
@@ -95,19 +98,21 @@ public class Player {
             try {
                 while (this.isBusy)
                     this.condition.await();
-                this.isBusy = true; // até aqui
-                // Insira codigo aqui
+                this.isBusy = true;
+
                 if (this.currentlyPlaying) {
                     this.wasPaused = false;
                     this.currentlyPlaying = false;
                     this.lastId = currentSongIndex;
                     this.scrubberThread.interrupt();
-                    this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+                    SwingUtilities.invokeLater(() -> {
+                        this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+                    });
                 }
                 else {
                     this.wasPaused = true;
                 }
-                // Copiar daqui
+
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -116,7 +121,6 @@ public class Player {
                 this.lock.unlock();
             }
         }).start();
-
     }
 
     private void onMouseRelease() {
@@ -126,13 +130,16 @@ public class Player {
                 try {
                     while (this.isBusy)
                         this.condition.await();
-                    this.isBusy = true; // até aqui
-                    // Insira codigo aqui
+                    this.isBusy = true;
+
                     this.currentlyPlaying = true;
                     this.scrubberThread = new ScrubberThread(this.playerWindow, this);
+                    Thread.sleep(500);
+                    SwingUtilities.invokeLater(() -> {
+                        this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
+                    });
                     this.scrubberThread.start();
-                    this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
-                    // Copiar daqui
+
                     this.isBusy = false;
                     this.condition.signalAll();
                 } catch (InterruptedException e) {
@@ -146,13 +153,15 @@ public class Player {
     }
 
     private void onMouseDrag() {
-        this.playerWindow.updateMiniplayer(true,
-                false,
-                false,
-                this.playerWindow.getScrubberValue(),
-                Integer.parseInt(this.currentSong[5]),
-                this.currentSongIndex,
-                this.amountSongs);
+        SwingUtilities.invokeLater(() -> {
+            this.playerWindow.updateMiniplayer(true,
+                    false,
+                    false,
+                    this.playerWindow.getScrubberValue(),
+                    Integer.parseInt(this.currentSong[5]),
+                    this.currentSongIndex,
+                    this.amountSongs);
+        });
     }
 
     private void playNowListener() {
@@ -163,29 +172,31 @@ public class Player {
         * Iniciar a thread de update do scrubber
         */
         new Thread(() -> {
+            System.out.println("Start");
             this.lock.lock();
             try {
                 while (this.isBusy)
                     this.condition.await();
-                this.isBusy = true; // até aqui
-                // Insira codigo aqui
-                System.out.println("Start");
+                this.isBusy = true;
+
                 if (this.currentlyPlaying) { this.scrubberThread.interrupt(); }
                 this.playerIsActive = true;
                 this.currentlyPlaying = true;
                 this.playerWindow.updatePlayPauseButton(true);
                 this.currentSongIndex = this.playerWindow.getSelectedSongID();
                 this.currentSong = this.queueArray[currentSongIndex];
-                this.playerWindow.updateMiniplayer(
-                        true,
-                        true,
-                        false,
-                        0,
-                        Integer.parseInt(currentSong[5]),
-                        currentSongIndex,
-                        amountSongs);
-                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
-                this.playerWindow.enableScrubberArea();
+                SwingUtilities.invokeLater(() -> {
+                    this.playerWindow.updateMiniplayer(
+                            true,
+                            true,
+                            false,
+                            0,
+                            Integer.parseInt(currentSong[5]),
+                            currentSongIndex,
+                            amountSongs);
+                    this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                    this.playerWindow.enableScrubberArea();
+                });
                 this.scrubberThread = new ScrubberThread(this.playerWindow, this);
                 this.scrubberThread.start();
 
@@ -196,7 +207,7 @@ public class Player {
             } finally {
                 this.lock.unlock();
             }
-        }).start();//ate aqui
+        }).start();
     }
 
     private void stopListener() {
@@ -207,14 +218,17 @@ public class Player {
             try {
                 while (this.isBusy)
                     this.condition.await();
-                this.isBusy = true; // até aqui
-                // Insira codigo aqui
+                this.isBusy = true;
+
                 this.playerIsActive = false;
                 this.currentlyPlaying = false;
-                this.playerWindow.resetMiniPlayer();
                 this.scrubberThread.interrupt();
-                this.playerWindow.disableScrubberArea();
-                // Copiar daqui
+
+                SwingUtilities.invokeLater(() -> {
+                    this.playerWindow.resetMiniPlayer();
+                    this.playerWindow.disableScrubberArea();
+                });
+
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -242,7 +256,9 @@ public class Player {
             if (this.clickedNextOrPrevious) { this.clickedNextOrPrevious = false;}
             else { this.currentSongIndex = this.playerWindow.getSelectedSongID(); }
             this.currentSong = this.queueArray[this.currentSongIndex];
-            this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+            SwingUtilities.invokeLater(() -> {
+                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+            });
             this.scrubberThread = new ScrubberThread(this.playerWindow, this);
             this.scrubberThread.start();
         }
@@ -262,12 +278,14 @@ public class Player {
             try {
                 while (this.isBusy)
                     this.condition.await();
-                this.isBusy = true; // até aqui
+                this.isBusy = true;
                 // Insira codigo aqui
                 String[] newSong = addSongWindow.getSong();
                 queueArray = getUpdatedQueue(newSong);
-                playerWindow.updateQueueList(queueArray);
-                // Copiar daqui
+                SwingUtilities.invokeLater(() -> {
+                    playerWindow.updateQueueList(queueArray);
+                });
+
                 this.isBusy = false;
                 this.condition.signalAll();
             } catch (InterruptedException e) {
@@ -275,7 +293,7 @@ public class Player {
             } finally {
                 this.lock.unlock();
             }
-        }).start();//ate aqui
+        }).start();
     }
 
     private String[][] getUpdatedQueue(String[] newSong) {
@@ -292,10 +310,6 @@ public class Player {
 
     private void removeSongListener() {
         System.out.println("Remove");
-        if (amountSongs == 0) {
-            System.out.println("No songs to remove");
-            return;
-        }
         // Por planejar utilizar as ids nas features futuras
         // Remover uma música atualiza as ids das que viriam depois da que foi removida
         new Thread(() -> {
@@ -304,6 +318,7 @@ public class Player {
                 while (this.isBusy)
                     this.condition.await();
                 this.isBusy = true;
+
                 String[][] updatedQueue = new String[this.amountSongs - 1][];
                 int toRemove = this.playerWindow.getSelectedSongID();
 
@@ -316,7 +331,10 @@ public class Player {
                     }
                 }
                 this.queueArray = updatedQueue;
-                this.playerWindow.updateQueueList(updatedQueue);
+
+                SwingUtilities.invokeLater(() -> {
+                    this.playerWindow.updateQueueList(updatedQueue);
+                });
                 this.amountSongs--;
                 if (toRemove == this.currentSongIndex){
                     this.stopListener();
@@ -333,6 +351,7 @@ public class Player {
     }
 
     private void nextSongListener() {
+        System.out.println("Next");
         new Thread(() -> {
             this.lock.lock();
             try {
@@ -340,22 +359,25 @@ public class Player {
                     this.condition.await();
                 this.isBusy = true;
 
-                System.out.println("Avançando");
-
                 // interromper a thread do scrubber
                 this.scrubberThread.interrupt();
                 if (!this.currentlyPlaying) { this.clickedNextOrPrevious = true; }
-                this.currentSongIndex++;
+                if ((this.currentSongIndex == this.amountSongs - 1) & this.isRepeating){
+                    this.currentSongIndex = 0;
+                }
+                else {this.currentSongIndex++;}
                 System.out.println(this.currentSongIndex);
                 this.currentSong = this.queueArray[this.currentSongIndex];
-                this.playerWindow.updateMiniplayer(true,
-                        false,
-                        false,
-                        0,
-                        Integer.parseInt(this.currentSong[5]),
-                        this.currentSongIndex,
-                        this.amountSongs);
-                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                SwingUtilities.invokeLater(() -> {
+                    this.playerWindow.updateMiniplayer(true,
+                            false,
+                            false,
+                            0,
+                            Integer.parseInt(this.currentSong[5]),
+                            this.currentSongIndex,
+                            this.amountSongs);
+                    this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                });
 
                 //iniciar nova thread
                 if (this.currentlyPlaying) {
@@ -375,15 +397,11 @@ public class Player {
 
     // Só planejamos utilizar essa função ao fim de uma música
     public void skipToNextSong() {
-        try {
-            Thread.sleep(1000); // Sem utilidade, só pra ter um delay natural
-        } catch (InterruptedException e) {
-            System.out.println("Sleep interrompido");
-        }
         this.nextSongListener();
     }
 
     private void previousSongListener() {
+        System.out.println("Previous");
         new Thread(() -> {
             this.lock.lock();
             try {
@@ -391,22 +409,25 @@ public class Player {
                     this.condition.await();
                 this.isBusy = true;
 
-                System.out.println("Retornando");
-
                 // interromper a thread do scrubber
                 this.scrubberThread.interrupt();
                 if (!this.currentlyPlaying) { this.clickedNextOrPrevious = true; }
-                this.currentSongIndex--;
+                if ((this.currentSongIndex == 0) & this.isRepeating){
+                    this.currentSongIndex = this.amountSongs - 1;
+                }
+                else {this.currentSongIndex--;}
                 System.out.println(this.currentSongIndex);
                 this.currentSong = this.queueArray[this.currentSongIndex];
-                this.playerWindow.updateMiniplayer(true,
-                        false,
-                        false,
-                        0,
-                        Integer.parseInt(this.currentSong[5]),
-                        this.currentSongIndex,
-                        this.amountSongs);
-                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                SwingUtilities.invokeLater(() -> {
+                    this.playerWindow.updateMiniplayer(true,
+                            false,
+                            false,
+                            0,
+                            Integer.parseInt(this.currentSong[5]),
+                            this.currentSongIndex,
+                            this.amountSongs);
+                    this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
+                });
 
                 //iniciar nova thread
                 if (this.currentlyPlaying) {
@@ -425,10 +446,45 @@ public class Player {
     }
 
     private void repeatListener() {
+        System.out.println("Repeat");
+        new Thread(() -> {
+            this.lock.lock();
+            try {
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
 
+                this.isRepeating = !this.isRepeating;
+
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
     }
 
     private void shuffleListener() {
+        System.out.println("Shuffle");
+        new Thread(() -> {
+            this.lock.lock();
+            try {
+                while (this.isBusy)
+                    this.condition.await();
+                this.isBusy = true;
+
+                this.isShuffling = !this.isShuffling;
+
+                this.isBusy = false;
+                this.condition.signalAll();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                this.lock.unlock();
+            }
+        }).start();
 
     }
 }

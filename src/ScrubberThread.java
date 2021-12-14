@@ -21,15 +21,27 @@ public class ScrubberThread extends Thread {
             System.out.println(this.playerObject.currentSongIndex);
             this.t0 = this.playerObject.lastId == this.playerObject.currentSongIndex ? p : 0;
             int tf = Integer.parseInt(this.playerObject.currentSong[5]);
+            SwingUtilities.invokeLater(() -> {
+                this.playerWindow.updateMiniplayer(true,
+                        true,
+                        this.playerObject.isRepeating,
+                        this.t0,
+                        tf,
+                        this.playerObject.currentSongIndex,
+                        this.playerObject.amountSongs);
+            });
+            Thread.sleep(1000);
             if (this.playerObject.currentlyPlaying) {
                 while (this.t0 <= tf) {
-                    this.playerWindow.updateMiniplayer(true,
-                            true,
-                            this.playerObject.isRepeating,
-                            this.t0,
-                            tf,
-                            this.playerObject.currentSongIndex,
-                            this.playerObject.amountSongs);
+                    SwingUtilities.invokeLater(() -> {
+                        this.playerWindow.updateMiniplayer(true,
+                                true,
+                                this.playerObject.isRepeating,
+                                this.t0,
+                                tf,
+                                this.playerObject.currentSongIndex,
+                                this.playerObject.amountSongs);
+                    });
                     this.t0 += 1;
                     Thread.sleep(1000);
                 }
