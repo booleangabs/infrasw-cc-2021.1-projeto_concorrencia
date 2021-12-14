@@ -1,5 +1,7 @@
 import ui.*;
 
+import javax.swing.*;
+
 public class ScrubberThread extends Thread {
     private final PlayerWindow playerWindow;
     private final Player playerObject;
@@ -23,7 +25,7 @@ public class ScrubberThread extends Thread {
                 while (this.t0 <= tf) {
                     this.playerWindow.updateMiniplayer(true,
                             true,
-                            false,
+                            this.playerObject.isRepeating,
                             this.t0,
                             tf,
                             this.playerObject.currentSongIndex,
@@ -32,24 +34,28 @@ public class ScrubberThread extends Thread {
                     Thread.sleep(1000);
                 }
                 // Caso a música acabar
-                // Se for no meio da playlist continue para a próxima
-                if (this.playerObject.currentSongIndex < this.playerObject.amountSongs - 1) {
-                    this.playerObject.skipToNextSong();
-                }
-                // Se essa foi a última, parar
-                // OBS: A ser modificado na implementação do botão repeat
-                else {
-                    this.playerWindow.updatePlayPauseButton(false);
-                    this.playerObject.currentlyPlaying = false;
-                    this.playerWindow.updateMiniplayer(true,
-                            false,
-                            false,
-                            tf,
-                            tf,
-                            this.playerObject.currentSongIndex,
-                            this.playerObject.amountSongs);
+                // Se essa foi a última e não estiver repetindo, parar
+                if ((this.playerObject.currentSongIndex == this.playerObject.amountSongs - 1)
+                        && !this.playerObject.isRepeating)
+                {
+                    SwingUtilities.invokeLater(() -> {
+                        this.playerWindow.updatePlayPauseButton(false);
+                        this.playerObject.currentlyPlaying = false;
+                        this.playerWindow.updateMiniplayer(true,
+                                false,
+                                false,
+                                tf,
+                                tf,
+                                this.playerObject.currentSongIndex,
+                                this.playerObject.amountSongs);
+                    });
                     System.out.println("Finished");
                 }
+                // Se for no meio da playlist continue para a próxima
+                else {
+                    this.playerObject.skipToNextSong();
+                }
+
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
