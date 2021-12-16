@@ -2,6 +2,8 @@ import ui.*;
 
 import javax.swing.*;
 import java.awt.event.*;
+import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.Condition;
@@ -26,6 +28,7 @@ public class Player {
     public boolean clickedNextOrPrevious = false;
     public boolean isRepeating = false;
     public boolean isShuffling = false;
+    public String[][] backupQueueArray = this.queueArray.clone();
 
     public Player() {
 
@@ -105,9 +108,9 @@ public class Player {
                     this.currentlyPlaying = false;
                     this.lastId = currentSongIndex;
                     this.scrubberThread.interrupt();
-                    SwingUtilities.invokeLater(() -> {
-                        this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
-                    });
+                    SwingUtilities.invokeLater(() ->
+                            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying)
+                    );
                 }
                 else {
                     this.wasPaused = true;
@@ -135,9 +138,9 @@ public class Player {
                     this.currentlyPlaying = true;
                     this.scrubberThread = new ScrubberThread(this.playerWindow, this);
                     Thread.sleep(500);
-                    SwingUtilities.invokeLater(() -> {
-                        this.playerWindow.updatePlayPauseButton(this.currentlyPlaying);
-                    });
+                    SwingUtilities.invokeLater(() ->
+                            this.playerWindow.updatePlayPauseButton(this.currentlyPlaying)
+                    );
                     this.scrubberThread.start();
 
                     this.isBusy = false;
@@ -153,15 +156,15 @@ public class Player {
     }
 
     private void onMouseDrag() {
-        SwingUtilities.invokeLater(() -> {
-            this.playerWindow.updateMiniplayer(true,
+        SwingUtilities.invokeLater(() ->
+                this.playerWindow.updateMiniplayer(true,
                     false,
                     false,
                     this.playerWindow.getScrubberValue(),
                     Integer.parseInt(this.currentSong[5]),
                     this.currentSongIndex,
-                    this.amountSongs);
-        });
+                    this.amountSongs)
+        );
     }
 
     private void playNowListener() {
@@ -256,9 +259,9 @@ public class Player {
             if (this.clickedNextOrPrevious) { this.clickedNextOrPrevious = false;}
             else { this.currentSongIndex = this.playerWindow.getSelectedSongID(); }
             this.currentSong = this.queueArray[this.currentSongIndex];
-            SwingUtilities.invokeLater(() -> {
-                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2]);
-            });
+            SwingUtilities.invokeLater(() ->
+                this.playerWindow.updatePlayingSongInfo(this.currentSong[0], this.currentSong[1], this.currentSong[2])
+            );
             this.scrubberThread = new ScrubberThread(this.playerWindow, this);
             this.scrubberThread.start();
         }
@@ -281,10 +284,12 @@ public class Player {
                 this.isBusy = true;
                 // Insira codigo aqui
                 String[] newSong = addSongWindow.getSong();
-                queueArray = getUpdatedQueue(newSong);
-                SwingUtilities.invokeLater(() -> {
-                    playerWindow.updateQueueList(queueArray);
-                });
+                String[][][] updates = getUpdatedQueues(newSong);
+                this.queueArray = updates[0];
+                this.backupQueueArray = updates[0];
+                SwingUtilities.invokeLater(() ->
+                    playerWindow.updateQueueList(this.queueArray)
+                );
 
                 this.isBusy = false;
                 this.condition.signalAll();
@@ -296,22 +301,21 @@ public class Player {
         }).start();
     }
 
-    private String[][] getUpdatedQueue(String[] newSong) {
+    private String[][][] getUpdatedQueues(String[] newSong) {
         // Constroi uma playlist atualizada a partir da queue atual
         String[][] updatedQueue = new String[this.amountSongs + 1][];
-        for (int i = 0; i < this.amountSongs; i++) {
-            updatedQueue[i] = this.queueArray[i];
-        }
+        String[][] updatedQueue2 = new String[this.amountSongs + 1][];
+        if (this.amountSongs >= 0) System.arraycopy(this.queueArray, 0, updatedQueue, 0, this.amountSongs);
+        if (this.amountSongs >= 0) System.arraycopy(this.backupQueueArray, 0, updatedQueue2, 0, this.amountSongs);
         updatedQueue[this.amountSongs] = newSong;
+        updatedQueue2[this.amountSongs] = newSong;
         this.amountSongs++;
         System.out.println("Added a song!");
-        return updatedQueue;
+        return new String[][][]{updatedQueue, updatedQueue2};
     }
 
     private void removeSongListener() {
         System.out.println("Remove");
-        // Por planejar utilizar as ids nas features futuras
-        // Remover uma música atualiza as ids das que viriam depois da que foi removida
         new Thread(() -> {
             this.lock.lock();
             try {
@@ -320,21 +324,30 @@ public class Player {
                 this.isBusy = true;
 
                 String[][] updatedQueue = new String[this.amountSongs - 1][];
+                String[][] updatedQueue2 = new String[this.amountSongs - 1][];
                 int toRemove = this.playerWindow.getSelectedSongID();
+                String[] toRemoveSong = this.queueArray[toRemove];
 
                 int j = 0;
                 for (int i = 0; i < this.amountSongs; i++) {
                     if (i != toRemove) {
                         updatedQueue[j] = this.queueArray[i];
-                        updatedQueue[j][6] = Integer.toString(j);
                         j++;
                     }
                 }
-                this.queueArray = updatedQueue;
 
-                SwingUtilities.invokeLater(() -> {
-                    this.playerWindow.updateQueueList(updatedQueue);
-                });
+                int idx = findSongIndex(toRemoveSong, this.backupQueueArray);
+                int k = 0;
+                for (int i = 0; i < this.amountSongs; i++) {
+                    if (i != idx) {
+                        updatedQueue2[k] = this.backupQueueArray[i];
+                        k++;
+                    }
+                }
+                this.queueArray = updatedQueue;
+                this.backupQueueArray = updatedQueue2;
+
+                SwingUtilities.invokeLater(() -> this.playerWindow.updateQueueList(updatedQueue));
                 this.amountSongs--;
                 if (toRemove == this.currentSongIndex){
                     this.stopListener();
@@ -348,6 +361,17 @@ public class Player {
                 this.lock.unlock();
             }
         }).start();
+    }
+
+    private int findSongIndex(String[] song, String[][] playlist) {
+        int i = 0;
+        for (String[] currentSong : playlist) {
+            if (!Arrays.equals(currentSong, song)) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
     }
 
     private void nextSongListener() {
@@ -476,6 +500,33 @@ public class Player {
                 this.isBusy = true;
 
                 this.isShuffling = !this.isShuffling;
+                this.currentSong = this.queueArray[this.currentSongIndex ];
+                if (this.isShuffling) {
+                    this.backupQueueArray = this.queueArray.clone();
+                    this.queueArray = shuffleArray(this.queueArray);
+                    for (int i = 0; i < this.queueArray.length; i++) {
+                        if (Arrays.equals(this.queueArray[i], this.currentSong)) {
+                            // Mais 1 pra não repetir a mesma música após clicar no botão
+                            this.currentSongIndex = i + 1;
+                        }
+                        else { this.currentSongIndex = 0; }
+                    }
+                }
+                else {
+                    this.queueArray = this.backupQueueArray.clone();
+                    for (int i = 0; i < this.queueArray.length; i++) {
+                        if (Arrays.equals(this.queueArray[i], this.currentSong)) {
+                            // Mais 1 pra não repetir a mesma música após clicar no botão
+                            this.currentSongIndex = i + 1;
+                        } else {
+                            this.currentSongIndex = 0;
+                        }
+                    }
+                }
+                System.out.println(this.currentSongIndex);
+                SwingUtilities.invokeLater(() ->
+                    this.playerWindow.updateQueueList(this.queueArray)
+                );
 
                 this.isBusy = false;
                 this.condition.signalAll();
@@ -485,6 +536,17 @@ public class Player {
                 this.lock.unlock();
             }
         }).start();
+    }
 
+    public String[][] shuffleArray(String[][] array) {
+        String[][] result = array.clone();
+        Random random = new Random();
+        for (int i = 0; i < result.length; i++) {
+            int toSwap = random.nextInt(result.length);
+            String[] aux = result[toSwap];
+            result[toSwap] = result[i];
+            result[i] = aux;
+        }
+        return result;
     }
 }
